@@ -16,7 +16,7 @@ def restriccion_talleres(*asignaciones):
 
 
 def restriccion_tipos_original(posiciones, aviones, talleres_std, talleres_spc, parkings):
-    conteo = {}  # Llevar un registro de talleres ocupados
+    conteo = {}   # Llevar un registro de talleres ocupados
 
     for avion, posicion in zip(aviones, posiciones):
         # Verificar compatibilidad del avión con el taller

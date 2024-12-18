@@ -1,11 +1,14 @@
 """ Created by Gabriel Rivera Amor in Dec 2024 
 Universidad Carlos III de Madrid """
 import sys
+from itertools import product
+import time
 
 #################################
 ##### Estructuras de Datos ######
 #################################
 movimientos_posibles = [(-1, 0), (1, 0), (0, -1), (0, 1), (0,0)]
+path_tests = "./parte-2/ASTAR-tests/"
 
 class Estado:
     def __init__(self,positions, time=0):
@@ -25,6 +28,10 @@ class Estado:
             if self.positions[i] != other.positions[i]:
                 equal = False
         return equal
+
+    #para poder reconocer cada estado de una manera única
+    def __hash__(self):
+        return hash((tuple(sorted(self.positions.items())), self.time))
 
     def find_adjacent(self, mapa):
         adjacent = []
@@ -75,12 +82,12 @@ class PriorityQueue(object):
         self.queue.append(data)
 
     def pop(self):
-        max_val = 0
+        min_val = 0
         for i in range(len(self.queue)):
-            if self.queue[i][0] > self.queue[max_val][0]:
-                max_val = i
-        item = self.queue[max_val][1]
-        del self.queue[max_val]
+            if self.queue[i][0] < self.queue[min_val][0]:
+                minval = i
+        item = self.queue[min_val][1]
+        del self.queue[min_val]
         return item
 
     #actualiza el valor de la función f de un estado en la lista abierta
@@ -139,52 +146,135 @@ def manhattan(estado, goal):
 
     return suma
 
-def reconstruir_camino(estado):
-    pass
+def hay_conflicto_cruce(posiciones_actuales, posiciones_nuevas):
+    for avion1, pos1 in posiciones_actuales.items():
+        for avion2, pos2 in posiciones_actuales.items():
+            if avion1 != avion2:
+                if pos1 == posiciones_nuevas.get(avion2) and pos2 == posiciones_nuevas.get(avion1):
+                    return True
+    return False
+
+def reconstruir_camino(predecesores, estado_final):
+    #Reconstruye el camino desde el estado inicial al objetivo utilizando los predecesores
+
+    camino = []
+    actual = estado_final
+    while actual in predecesores:
+        camino.append(actual)
+        actual = predecesores[actual]
+    camino.append(actual)  # Añadimos el estado inicial
+    camino.reverse()  # Invertimos el camino para que esté en orden
+    return camino
+
+def escritura_camino(path, camino):
+    with open(path, 'w') as f:
+        #por cada avión
+        for avion in camino[0].positions.keys():
+            #recorremos las posiciones del avion en los distintos estados
+            for i in range(len(camino)):
+                if i < len(camino) -1:
+                    pos_inicial = camino[i].positions[avion]
+                    siguiente_pos = camino[i + 1].positions[avion]
+                    if pos_inicial == siguiente_pos:
+                        f.write(f"({pos_inicial[0]},{pos_inicial[1]}) w ")
+                    elif pos_inicial[1] < siguiente_pos[1]:
+                        f.write(f"({pos_inicial[0]},{pos_inicial[1]})  ← ") #flecha para izquierda
+                    elif pos_inicial[1] > siguiente_pos[1]:
+                        f.write(f"({pos_inicial[0]},{pos_inicial[1]})  → ") #flecha para derecha
+                    elif pos_inicial[0] < siguiente_pos[0]:
+                        f.write(f"({pos_inicial[0]},{pos_inicial[1]})  ↓ ") #flecha para abajo
+                    elif pos_inicial[0] > siguiente_pos[0]:
+                        f.write(f"({pos_inicial[0]},{pos_inicial[1]}) ↑ ") #flecha para arriba
+
+                    #print(pos_inicial, siguiente_pos, pos_inicial[0], siguiente_pos[0], pos_inicial[1], siguiente_pos[1])
+                    #f.write(f"Tiempo {estado.time}: {posiciones}\n")
+                else:
+                    f.write(f"({camino[i].positions[avion][0]},{camino[i].positions[avion][1]}) \n")
+
+def escritura_stats(path, time, makespan, h_inicial, expanded):
+    with open(path, 'w') as f:
+        f.write(f"Tiempo total: {time:.2f}s \n")
+        f.write(f"Makespan: {makespan} \n")
+        f.write(f"h inicial: {h_inicial} \n")
+        f.write(f"Nodos expandidos: {expanded} \n")
 
 #################################
 ########## Función A* ###########
 #################################
-def ASTAR(start, goal, mapa, heuristica):
-    open_list = PriorityQueue() #frontera
-    open_list.insert((0,start))
+def ASTAR(start, goal, mapa, heuristica, output_file=None):
+    open_list = PriorityQueue()  # Frontera
+    open_list.insert((0, start))
     visitados = set()
     costes = {start: 0}
+    predecesores = {}  # Diccionario para rastrear el camino
 
-    while open_list:
+    while not open_list.isEmpty():
         current = open_list.pop()
 
         if current == goal:
-            return reconstruir_camino(current)
+            print("Objetivo conseguido")
+            camino = reconstruir_camino(predecesores, current)
+            if heuristica == 1:
+                return camino, current.time, manhattan(start, goal), len(visitados)
+            else:
+                return camino, current.time, manhattan(start, goal), len(visitados)
 
         if current in visitados:
             continue
         visitados.add(current)
 
-        for i, pos in enumerate(current.positions.values()):
-            for nuevo_pos in movimientos_validos(pos, mapa) + [pos]:
-                nuevo_estado = list(current.positions.values())
-                nuevo_estado[i] = nuevo_pos
-                nuevo_estado = Estado(nuevo_estado, current.time + 1)
+        # Generar todas las combinaciones de movimientos para todos los aviones
+        movimientos_aviones = []
+        for pos in current.positions.values():
+            movimientos_aviones.append(movimientos_validos(pos, mapa) + [pos])  # Agregar espera
 
-                if nuevo_estado in visitados:
-                    continue
+        # Crear combinaciones de movimientos paralelos
+        for combinacion in product(*movimientos_aviones):  # Todas las combinaciones posibles
+            nuevo_positions = {i: combinacion[i] for i in range(len(combinacion))}
 
-                coste = costes[current] + 1  # Todos los movimientos tienen coste 1
-                if nuevo_estado not in costes or coste < costes[nuevo_estado]:
-                    costes[nuevo_estado] = coste
-                    if heuristica == 1:
-                        heuristic = manhattan(nuevo_estado, goal)
-                    else:
-                        heuristic = manhattan(nuevo_estado, goal)
-                    #heapq.heappush(frontera, (coste + heur, nuevo_estado))
+            # Validar que no haya colisiones
+            if len(set(nuevo_positions.values())) != len(nuevo_positions):  # Checar posiciones únicas
+                continue
+
+            # Validar conflictos de cruce
+            if hay_conflicto_cruce(current.positions, nuevo_positions):
+                continue
+
+            # Crear el nuevo estado
+            nuevo_estado = Estado(nuevo_positions, current.time + 1)
+
+            if nuevo_estado in visitados:
+                continue
+
+            coste = costes[current] + 1  # Todos los movimientos tienen coste 1
+            if nuevo_estado not in costes or coste < costes[nuevo_estado]:
+                costes[nuevo_estado] = coste
+                predecesores[nuevo_estado] = current  # Guardar el predecesor
+                if heuristica == 1:
+                    heuristic = manhattan(nuevo_estado, goal)
+                else:
+                    heuristic = manhattan(nuevo_estado, goal)
+                f = coste + heuristic
+                open_list.insert((f, nuevo_estado))
+
+    print("No se encontró solución.")
     return None
 
 if __name__ == "__main__":
+    inicio = time.time()
     archivo_mapa = sys.argv[1]
     num_heuristica = int(sys.argv[2])
     start, goal, mapa = cargar_mapa(archivo_mapa)
-    ASTAR(start, goal, mapa, num_heuristica)
+    camino, makespan, h_inicial, expanded = ASTAR(start, goal, mapa, num_heuristica)
+    if camino == None:
+        path = path_tests + "mapa-" + str(num_heuristica) + ".output"
+        with open(path, 'w') as f:
+            f.write("No existe una solución para este problema")
 
-
-    print(start == goal)
+    else:
+        path_camino = path_tests + "mapa-" + str(num_heuristica) + ".output"
+        escritura_camino(path_camino, camino)
+        fin = time.time()
+        tiempo_ejecucion = fin - inicio
+        path_stat = path_tests + "mapa-" + str(num_heuristica) + ".stat"
+        escritura_stats(path_stat, tiempo_ejecucion, makespan, h_inicial, expanded)

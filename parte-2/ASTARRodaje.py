@@ -4,6 +4,8 @@ import sys
 from itertools import product
 import time
 
+from orca.punctuation_settings import infinity
+
 #################################
 ##### Estructuras de Datos ######
 #################################
@@ -138,13 +140,16 @@ def movimientos_validos(pos, mapa):
     return [(nx, ny) for nx, ny in posibles if 0 <= nx < filas and 0 <= ny < columnas and mapa[nx][ny].color != 'G']
 
 def manhattan(estado, goal):
-    suma = 0
+    #devolvemos la distancia manhattan maximade los aviones
+    max = 0
     for i in estado.positions.keys():
         actual = estado.positions[i]
         objetivo = goal.positions[i]
-        suma += (abs(actual[0] - objetivo[0]) + abs(actual[1] - objetivo[1]))
+        distancia =  (abs(actual[0] - objetivo[0]) + abs(actual[1] - objetivo[1]))
+        if distancia > max:
+            max = distancia
 
-    return suma
+    return max
 
 def hay_conflicto_cruce(posiciones_actuales, posiciones_nuevas):
     for avion1, pos1 in posiciones_actuales.items():

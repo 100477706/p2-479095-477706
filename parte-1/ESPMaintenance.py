@@ -69,32 +69,32 @@ def restriccion_talleres(*asignaciones):
 #
 #     return True
 
-def restriccion_orden_tareas(avion, talleres_std, talleres_spc, *asignaciones):
-    t2 = avion['t2']  # Número de tareas tipo 2 pendientes
-    t1 = avion['t1']  # Número de tareas tipo 1 pendientes
-
-    for i, posicion in enumerate(asignaciones):
-        # Mientras haya tareas de tipo 2 pendientes
-        if t2 > 0:
-            if posicion not in talleres_spc:
-                print(f"Restricción violada: En franja {i}, tarea tipo 2 no está en taller especializado.")
-                return False
-            t2 -= 1  # Consumir una tarea de tipo 2
-
-        # Cuando no queden tareas de tipo 2, pero sí de tipo 1
-        elif t1 > 0:
-            if posicion not in talleres_std:
-                print(f"Restricción violada: En franja {i}, tarea tipo 1 no está en taller estándar.")
-                return False
-            t1 -= 1  # Consumir una tarea de tipo 1
-
-        # Si no quedan tareas de ningún tipo, no hay restricciones en la franja
-        else:
-            if posicion not in parkings:
-                print(f"Restricción violada: En franja {i}, no se asignó un parking.")
-                return False
-
-    return True
+# def restriccion_orden_tareas(avion, talleres_std, talleres_spc, *asignaciones):
+#     t2 = avion['t2']  # Número de tareas tipo 2 pendientes
+#     t1 = avion['t1']  # Número de tareas tipo 1 pendientes
+#
+#     for i, posicion in enumerate(asignaciones):
+#         # Mientras haya tareas de tipo 2 pendientes
+#         if t2 > 0:
+#             if posicion not in talleres_spc:
+#                 print(f"Restricción violada: En franja {i}, tarea tipo 2 no está en taller especializado.")
+#                 return False
+#             t2 -= 1  # Consumir una tarea de tipo 2
+#
+#         # Cuando no queden tareas de tipo 2, pero sí de tipo 1
+#         elif t1 > 0:
+#             if posicion not in talleres_std:
+#                 print(f"Restricción violada: En franja {i}, tarea tipo 1 no está en taller estándar.")
+#                 return False
+#             t1 -= 1  # Consumir una tarea de tipo 1
+#
+#         # Si no quedan tareas de ningún tipo, no hay restricciones en la franja
+#         else:
+#             if posicion not in parkings:
+#                 print(f"Restricción violada: En franja {i}, no se asignó un parking.")
+#                 return False
+#
+#     return True
 
 def restriccion_tipos(posiciones, aviones, talleres_std, talleres_spc, parkings):
     conteo_talleres = {}  # Lleva el registro de aviones en talleres
@@ -155,6 +155,43 @@ def restriccion_tipos(posiciones, aviones, talleres_std, talleres_spc, parkings)
     return True
 
 
+def restriccion_orden_tareas(avion, talleres_std, talleres_spc, parkings, *asignaciones):
+    t2 = avion['t2']  # Número de tareas tipo 2 pendientes
+    t1 = avion['t1']  # Número de tareas tipo 1 pendientes
+
+    for i, posicion in enumerate(asignaciones):
+        # Mientras haya tareas de tipo 2 pendientes
+        if t2 > 0:
+            if posicion not in talleres_spc:
+                if posicion in parkings:
+                    print(f"Avión {avion['id']} en franja {i}: sin taller especializado disponible, asignado a parking.")
+                    continue  # Tarea no completada, pero asignado a parking
+                print(f"Restricción violada: En franja {i}, tarea tipo 2 no está en taller especializado ni en un parking.")
+                return False
+            t2 -= 1  # Consumir una tarea de tipo 2
+
+        # Cuando no queden tareas de tipo 2, pero sí de tipo 1
+        elif t1 > 0:
+            if posicion not in talleres_std:
+                if posicion in parkings:
+                    print(f"Avión {avion['id']} en franja {i}: sin taller estándar disponible, asignado a parking.")
+                    continue  # Tarea no completada, pero asignado a parking
+                print(f"Restricción violada: En franja {i}, tarea tipo 1 no está en taller estándar ni en un parking.")
+                return False
+            t1 -= 1  # Consumir una tarea de tipo 1
+
+        # Si no quedan tareas de ningún tipo, no hay restricciones en la franja
+        else:
+            if posicion not in parkings:
+                print(f"Restricción violada: En franja {i}, no se asignó un parking.")
+                return False
+
+    # Verificar si al final quedaron tareas sin completar
+    if t1 > 0 or t2 > 0:
+        print(f"Avión {avion['id']} todavía tiene tareas pendientes: T2={t2}, T1={t1}.")
+    return True
+
+
 def restriccion_maniobrabilidad(*asignaciones):
     ocupados = set(asignaciones)
     print(f"Posiciones ocupadas: {ocupados}")
@@ -210,7 +247,7 @@ def definir_modelo(franjas, m_fila, m_columna, talleres_std, talleres_spc, parki
 
     # Dominios: Cada avión puede ir a cualquier taller estándar o especialista
 
-    talleres = talleres_std + talleres_spc + parkings
+    talleres = [pos for pos in (talleres_std + talleres_spc + parkings) if 0 <= pos[0] < m_fila and 0 <= pos[1] < m_columna]
     for avion in aviones:
         for franja in range(franjas):
             problema.addVariable(f"A{avion['id']}_T{franja}", talleres)
@@ -218,6 +255,7 @@ def definir_modelo(franjas, m_fila, m_columna, talleres_std, talleres_spc, parki
     # ubicaciones = talleres_std + talleres_spc + parkings
     # for avion in aviones:
     #     problema.addVariable(f"A{avion['id']}", ubicaciones)
+
 
     for franja in range(franjas):
         problema.addConstraint(restriccion_talleres,
@@ -236,6 +274,7 @@ def definir_modelo(franjas, m_fila, m_columna, talleres_std, talleres_spc, parki
                 problema.addConstraint(
                     lambda *asignaciones, avion=avion: restriccion_orden_tareas(avion, talleres_std,
                                                                                 talleres_spc,
+                                                                                parkings,
                                                                                 *asignaciones),
                     [f"A{avion['id']}_T{t}" for t in range(franjas)]
                 )
@@ -261,12 +300,18 @@ def definir_modelo(franjas, m_fila, m_columna, talleres_std, talleres_spc, parki
     #     [f"A{avion['id']}" for avion in aviones]
     # )
 
-    # Forzar que el avión 2 esté en la posición (2, 1) en la franja 0
-    problema.addConstraint(lambda posicion: posicion == (2, 3), (f"A2_T0",))
-    problema.addConstraint(lambda posicion: posicion == (2, 1), (f"A3_T0",))
-    problema.addConstraint(lambda posicion: posicion == (3, 0), (f"A4_T0",))
-    problema.addConstraint(lambda posicion: posicion == (3, 3), (f"A5_T0",))
-    problema.addConstraint(lambda posicion: posicion == (0, 3), (f"A6_T0",))
+    # # Forzar que el avión 2 esté en la posición (2, 1) en la franja 0
+    # problema.addConstraint(lambda posicion: posicion == (2, 3), (f"A2_T0",))
+    # problema.addConstraint(lambda posicion: posicion == (2, 1), (f"A3_T0",))
+    # problema.addConstraint(lambda posicion: posicion == (3, 0), (f"A4_T0",))
+    # problema.addConstraint(lambda posicion: posicion == (3, 3), (f"A5_T0",))
+    # problema.addConstraint(lambda posicion: posicion == (0, 3), (f"A6_T0",))
+    #
+    # problema.addConstraint(lambda posicion: posicion == (2, 3), (f"A2_T1",))
+    # problema.addConstraint(lambda posicion: posicion == (2, 1), (f"A3_T1",))
+    # problema.addConstraint(lambda posicion: posicion == (3, 0), (f"A4_T1",))
+    # problema.addConstraint(lambda posicion: posicion == (3, 3), (f"A5_T1",))
+    # problema.addConstraint(lambda posicion: posicion == (0, 0), (f"A6_T1",))
 
 
     soluciones = problema.getSolutions()
@@ -290,12 +335,12 @@ if __name__ == "__main__":
     talleres_spc = [(0, 3), (2, 1), (2, 3), (3, 0), (3, 3)]
     parkings = [(0, 0), (0, 1), (1, 0), (1, 4), (2, 4), (3, 1), (3, 2), (3, 4), (4, 0), (4, 4)]
     aviones = [
-        {'id': 1, 'tipo': 'JMB', 'restr': True, 't1': 1, 't2': 1},
-        {'id': 2, 'tipo': 'JMB', 'restr': True, 't1': 0, 't2': 1},
-        {'id': 3, 'tipo': 'JMB', 'restr': True, 't1': 0, 't2': 1},
-        {'id': 4, 'tipo': 'JMB', 'restr': True, 't1': 0, 't2': 1},
-        {'id': 5, 'tipo': 'JMB', 'restr': True, 't1': 0, 't2': 1},
-        {'id': 6, 'tipo': 'JMB', 'restr': True, 't1': 0, 't2': 1}
+        {'id': 1, 'tipo': 'JMB', 'restr': True, 't1': 1, 't2': 1}
+        # {'id': 2, 'tipo': 'JMB', 'restr': True, 't1': 0, 't2': 2},
+        # {'id': 3, 'tipo': 'JMB', 'restr': True, 't1': 0, 't2': 2},
+        # {'id': 4, 'tipo': 'JMB', 'restr': True, 't1': 0, 't2': 2},
+        # {'id': 5, 'tipo': 'JMB', 'restr': True, 't1': 0, 't2': 2},
+        # {'id': 6, 'tipo': 'JMB', 'restr': True, 't1': 0, 't2': 1}
 
     ]
 

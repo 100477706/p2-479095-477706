@@ -3,6 +3,8 @@ import csv
 from constraint import Problem
 import sys
 
+
+#Función encargada de leer el archivo de entrada
 def leer_entrada(ruta_archivo):
     with open(ruta_archivo, 'r') as archivo:
         lineas = archivo.readlines()
@@ -34,21 +36,7 @@ def leer_entrada(ruta_archivo):
 
     return franjas, m_filas, m_columnas, talleres_std, talleres_spc, parkings, aviones
 
-
-# def restriccion_talleres(*asignaciones):
-#     conteo = {}
-#     for avion, posicion in zip(aviones, asignaciones):
-#         if avion['tipo'] == 'JMB':
-#             if posicion in conteo:
-#                 return False  # Un taller ya está ocupado por otro avión
-#             else:
-#                 conteo[posicion] = 2  # Un JUMBO ocupa
-#         else:
-#             conteo[posicion] = conteo.get(posicion, 0) + 1
-#             if conteo[posicion] > 2:
-#                 return False  # Más de dos aviones en un taller
-#     return True
-
+#Función encargada de garantizar la cantidad de aviones
 def restriccion_talleres(*asignaciones):
     conteo = {}
     jumbo_present = set()
@@ -64,131 +52,50 @@ def restriccion_talleres(*asignaciones):
                 return False  # No más de dos aviones estándar
     return True
 
-
-# def restriccion_tipos(posiciones, aviones, talleres_std, talleres_spc, parkings):
-#     conteo_talleres = {}  # Llevar un registro de talleres ocupados
-#     conteo_parkings = {}  # Llevar un registro de parkings ocupados
-#
-#     for avion, posicion in zip(aviones, posiciones):
-#         # Caso 1: Avión sin tareas pendientes (t1 == 0 y t2 == 0)
-#         if avion['t1'] == 0 and avion['t2'] == 0:
-#             if posicion not in parkings:
-#                 return False  # Avión sin tareas debe ir a un parking
-#
-#         # Caso 2: Avión con tareas pendientes (t1 > 0 o t2 > 0)
-#         else:
-#             if posicion in talleres_spc and avion['t2'] >= 1:
-#                 # Taller especializado compatible
-#                 conteo_talleres[posicion] = conteo_talleres.get(posicion, 0) + 1
-#                 if conteo_talleres[posicion] > 1:
-#                     return False  # Un taller solo puede atender un avión especializado
-#             elif posicion in talleres_std and avion['t1'] >= 1:
-#                 # Taller estándar compatible
-#                 conteo_talleres[posicion] = conteo_talleres.get(posicion, 0) + 1
-#                 if conteo_talleres[posicion] > 2:
-#                     return False  # Un taller estándar puede atender hasta 2 aviones
-#             elif posicion in parkings:
-#                 # Verificar que los talleres estén ocupados antes de permitir parking
-#                 if any(count < 2 for pos, count in conteo_talleres.items() if pos in talleres_std) or \
-#                    any(count < 1 for pos, count in conteo_talleres.items() if pos in talleres_spc):
-#                     return False  # Hay talleres disponibles, no puede ir a un parking
-#                 conteo_parkings[posicion] = conteo_parkings.get(posicion, 0) + 1
-#                 if conteo_parkings[posicion] > 1:
-#                     return False  # Un parking solo puede albergar un avión
-#             else:
-#                 return False  # Posición inválida
-#
-#         # Verificar exclusividad del taller o parking
-#         if posicion in conteo_talleres or posicion in conteo_parkings:
-#             if conteo_talleres.get(posicion, 0) > 2 or conteo_parkings.get(posicion, 0) > 1:
-#                 return False
-#
-#     return True
-
-# def restriccion_orden_tareas(avion, talleres_std, talleres_spc, *asignaciones):
-#     t2 = avion['t2']  # Número de tareas tipo 2 pendientes
-#     t1 = avion['t1']  # Número de tareas tipo 1 pendientes
-#
-#     for i, posicion in enumerate(asignaciones):
-#         # Mientras haya tareas de tipo 2 pendientes
-#         if t2 > 0:
-#             if posicion not in talleres_spc:
-#                 print(f"Restricción violada: En franja {i}, tarea tipo 2 no está en taller especializado.")
-#                 return False
-#             t2 -= 1  # Consumir una tarea de tipo 2
-#
-#         # Cuando no queden tareas de tipo 2, pero sí de tipo 1
-#         elif t1 > 0:
-#             if posicion not in talleres_std:
-#                 print(f"Restricción violada: En franja {i}, tarea tipo 1 no está en taller estándar.")
-#                 return False
-#             t1 -= 1  # Consumir una tarea de tipo 1
-#
-#         # Si no quedan tareas de ningún tipo, no hay restricciones en la franja
-#         else:
-#             if posicion not in parkings:
-#                 print(f"Restricción violada: En franja {i}, no se asignó un parking.")
-#                 return False
-#
-#     return True
-
+#Función encargada de establecer los posibles dominios segun las tareas a realizar
 def restriccion_tipos(posiciones, aviones, talleres_std, talleres_spc, parkings):
     conteo_talleres = {}  # Lleva el registro de aviones en talleres
     jumbo_present = set()  # Lleva el registro de talleres con aviones JUMBO
     conteo_parkings = {}  # Lleva el registro de aviones en parkings
 
     for avion, posicion in zip(aviones, posiciones):
-        # # Caso 1: Avión sin tareas pendientes debe ir a un parking
-        # if avion['t1'] == 0 and avion['t2'] == 0:
-        #     if posicion not in parkings:
-        #         return False  # Avión sin tareas debe ir a un parking
-        #     if avion['tipo'] == 'JMB':
-        #         if posicion in jumbo_present:
-        #             return False  # No puede haber más de un JUMBO en un taller
-        #         jumbo_present.add(posicion)
-        #     conteo_parkings[posicion] = conteo_parkings.get(posicion, 0) + 1
-        #     if conteo_parkings[posicion] > 2:
-        #         return False  # Un parking solo puede albergar dos aviones
-        #
-        # # Caso 2: Avión con tareas pendientes
-        # else:
-            if posicion in talleres_spc:
-                if (avion['t2'] >= 1) or (avion['t1'] >= 1):  # Taller especializado
-                    if avion['tipo'] == 'JMB':
-                        if posicion in jumbo_present:
-                            return False  # No puede haber más de un JUMBO en un taller
-                        jumbo_present.add(posicion)
-                    conteo_talleres[posicion] = conteo_talleres.get(posicion, 0) + 1
-                    if conteo_talleres[posicion] > 2:
-                        return False  # Un taller especializado puede atender solo un avión
-
-            if posicion in talleres_std and avion['t1'] >= 1:  # Taller estándar
-                if avion['tipo'] == 'JMB':
-                    if posicion in jumbo_present:
-                        return False  # No puede haber más de un JUMBO en el taller
-                    jumbo_present.add(posicion)
-                conteo_talleres[posicion] = conteo_talleres.get(posicion, 0) + 1
-                if conteo_talleres[posicion] > 2:
-                    return False  # Un taller estándar puede atender hasta 2 aviones
-
-            if posicion in parkings:
-                # Verificar que los talleres estén ocupados antes de permitir parking
-                if any(count < 2 for pos, count in conteo_talleres.items() if
-                       pos in talleres_std) or \
-                        any(count < 1 for pos, count in conteo_talleres.items() if
-                            pos in talleres_spc):
-                    return False  # Hay talleres disponibles, no puede ir a un parking
+        if posicion in talleres_spc:
+            if (avion['t2'] >= 1) or (avion['t1'] >= 1):  # Taller especializado
                 if avion['tipo'] == 'JMB':
                     if posicion in jumbo_present:
                         return False  # No puede haber más de un JUMBO en un taller
                     jumbo_present.add(posicion)
-                conteo_parkings[posicion] = conteo_parkings.get(posicion, 0) + 1
-                if conteo_parkings[posicion] > 2:
-                    return False  # Un parking solo puede albergar un avión
+                conteo_talleres[posicion] = conteo_talleres.get(posicion, 0) + 1
+                if conteo_talleres[posicion] > 2:
+                    return False  # Un taller especializado puede atender solo un avión
+
+        if posicion in talleres_std and avion['t1'] >= 1:  # Taller estándar
+            if avion['tipo'] == 'JMB':
+                if posicion in jumbo_present:
+                    return False  # No puede haber más de un JUMBO en el taller
+                jumbo_present.add(posicion)
+            conteo_talleres[posicion] = conteo_talleres.get(posicion, 0) + 1
+            if conteo_talleres[posicion] > 2:
+                return False  # Un taller estándar puede atender hasta 2 aviones
+
+        if posicion in parkings:
+            # Verificar que los talleres estén ocupados antes de permitir parking
+            if any(count < 2 for pos, count in conteo_talleres.items() if
+                   pos in talleres_std) or \
+                    any(count < 1 for pos, count in conteo_talleres.items() if
+                        pos in talleres_spc):
+                return False  # Hay talleres disponibles, no puede ir a un parking
+            if avion['tipo'] == 'JMB':
+                if posicion in jumbo_present:
+                    return False  # No puede haber más de un JUMBO en un taller
+                jumbo_present.add(posicion)
+            conteo_parkings[posicion] = conteo_parkings.get(posicion, 0) + 1
+            if conteo_parkings[posicion] > 2:
+                return False  # Un parking solo puede albergar un avión
 
     return True
 
-
+#Función encargada de imponer el orden de ejecución de las tareas
 def restriccion_orden_tareas(avion, talleres_std, talleres_spc, parkings, *asignaciones):
     t2 = avion['t2']  # Número de tareas tipo 2 pendientes
     t1 = avion['t1']  # Número de tareas tipo 1 pendientes
@@ -211,25 +118,20 @@ def restriccion_orden_tareas(avion, talleres_std, talleres_spc, parkings, *asign
                     continue  # Tarea no completada, pero asignado a parking
                 return False
 
-        # Si no quedan tareas de ningún tipo, no hay restricciones en la franja
-        # else:
-        #     if posicion not in parkings:
-        #         print(f"Restricción violada: En franja {i}, no se asignó un parking.")
-        #         return False
-
     # Verificar si al final quedaron tareas sin completar
     if t1 > 0 or t2 > 0:
         return False
     return True
 
+#Función que verifica que todas las tareas se han realizado
 def verificar_completitud(asignaciones, tareas, talleres_std, talleres_spc):
     return sum(1 for pos in asignaciones if pos in talleres_std + talleres_spc) >= tareas
 
-# Función auxiliar: verifica si las tareas T2 están cubiertas en talleres especializados
+# Función que verifica si las tareas T2 están cubiertas en talleres especializados
 def verificar_tarea(asignaciones, required_t2, talleres_spc):
     return sum(1 for pos in asignaciones if pos in talleres_spc) >= required_t2
 
-
+#Función que establece las restricciones de los espacios para permitir la maniobrabilidad
 def restriccion_maniobrabilidad(m_fila, m_columna, *asignaciones):
     ocupados = set(asignaciones)
     for posicion in ocupados:
@@ -248,6 +150,7 @@ def restriccion_maniobrabilidad(m_fila, m_columna, *asignaciones):
 
     return True
 
+#Función encargada de garantizar los espacios necesarios para mover aviones JUMBO
 def restriccion_no_jumbos_adyacentes(aviones, *asignaciones):
     ocupados = set(asignaciones)  # Todas las posiciones asignadas
     jumbos = [avion for avion in aviones if avion['tipo'] == 'JMB']  # Filtrar aviones JUMBO
@@ -272,6 +175,7 @@ def restriccion_no_jumbos_adyacentes(aviones, *asignaciones):
 
     return True
 
+#Función encargada de escribir en el archivo de salida
 def escribir_salida(output_file, solutions, aviones, franjas, talleres_std, talleres_spc):
     """
     Escribe las soluciones en un archivo CSV.
@@ -311,34 +215,25 @@ def escribir_salida(output_file, solutions, aviones, franjas, talleres_std, tall
                     " | ".join(asignaciones)
                 ])
 
-
-# def escribir_salida(ruta_archivo, soluciones, aviones, franjas):
-#     ruta_salida = ruta_archivo.replace(".csv", "_salida.csv")
-#     with open(ruta_salida, 'w') as archivo:
-#         archivo.write(f"N. Soluciones: {len(soluciones)}\n")
-#         for idx, solucion in enumerate(soluciones, 1):
-#             archivo.write(f"Solución {idx}:\n")
-#             for avion in aviones:
-#                 asignaciones = [solucion[f"A{avion['id']}_T{t}"] for t in range(franjas)]
-#                 archivo.write(f"{avion['id']}-{avion['tipo']}-{avion['restr']}-{avion['t1']}-{avion['t2']}: {', '.join(map(str, asignaciones))}\n")
-
-
-
+#Función Principal que llama a las funciones de las restricciones
 def definir_modelo(franjas, m_fila, m_columna, talleres_std, talleres_spc, parkings, aviones):
     problema = Problem()
 
     # Crear variables para cada avión en cada franja horaria
     # Dominios: Cada avión puede ir a cualquier taller estándar o especialista
 
+    # Creamos el dominio de variables
     talleres = talleres_std + talleres_spc + parkings
     for avion in aviones:
         for franja in range(franjas):
             problema.addVariable(f"A{avion['id']}_T{franja}", talleres)
 
+    # Establecemos el dominio para cada tipo de avion
     for franja in range(franjas):
         problema.addConstraint(restriccion_talleres,
                               [f"A{avion['id']}_T{franja}" for avion in aviones])
 
+    # Establecemos la posible distrubucion segun las tareas a realzar
     for franja in range(franjas):
         problema.addConstraint(
             lambda *posiciones, franja=franja: restriccion_tipos(posiciones, aviones, talleres_std,
@@ -346,6 +241,7 @@ def definir_modelo(franjas, m_fila, m_columna, talleres_std, talleres_spc, parki
             [f"A{avion['id']}_T{franja}" for avion in aviones]
         )
 
+    # Se encarga de imponer un orden en las tareas
     for avion in aviones:
         if avion['t1'] > 0 or avion['t2'] > 0:
             if avion['restr'] == True:
@@ -375,51 +271,26 @@ def definir_modelo(franjas, m_fila, m_columna, talleres_std, talleres_spc, parki
                         variables
                     )
 
+    # Se encarga que al menos haya un hueco en horizontal o en vertical
     problema.addConstraint(
         lambda *asignaciones: restriccion_maniobrabilidad(m_fila, m_columna, *asignaciones),
         [f"A{avion['id']}_T{t}" for avion in aviones for t in range(franjas)]
     )
 
+    # Se encarga de que garantizar que no haya JUMBOS en vertical y en horizontal cuando hay un
+    # JUMBO en esa posicion
     problema.addConstraint(
         lambda *asignaciones: restriccion_no_jumbos_adyacentes(aviones, *asignaciones),
         [f"A{avion['id']}_T{t}" for avion in aviones for t in range(franjas)]
     )
 
-    # problema.addConstraint(
-    #     lambda *posiciones: restriccion_tipos(posiciones, aviones, talleres_std, talleres_spc,
-    #                                           parkings),
-    #     [f"A{avion['id']}" for avion in aviones]
-    # )
-    # problema.addConstraint(restriccion_maniobrabilidad)
-    # problema.addConstraint(
-    #     lambda *asignaciones: restriccion_no_jumbos_adyacentes(aviones, *asignaciones),
-    #     [f"A{avion['id']}" for avion in aviones]
-    # )
-
-    # # Forzar que el avión 2 esté en la posición (2, 1) en la franja 0
-    # problema.addConstraint(lambda posicion: posicion == (2, 3), (f"A2_T0",))
-    # problema.addConstraint(lambda posicion: posicion == (2, 1), (f"A3_T0",))
-    # problema.addConstraint(lambda posicion: posicion == (3, 0), (f"A4_T0",))
-    # problema.addConstraint(lambda posicion: posicion == (3, 3), (f"A5_T0",))
-    # problema.addConstraint(lambda posicion: posicion == (0, 3), (f"A6_T0",))
-    #
-    # problema.addConstraint(lambda posicion: posicion == (2, 3), (f"A2_T1",))
-    # problema.addConstraint(lambda posicion: posicion == (2, 1), (f"A3_T1",))
-    # problema.addConstraint(lambda posicion: posicion == (3, 0), (f"A4_T1",))
-    # problema.addConstraint(lambda posicion: posicion == (3, 3), (f"A5_T1",))
-    # problema.addConstraint(lambda posicion: posicion == (0, 0), (f"A6_T1",))
-
-
+    # Función que genera las soluciones
     soluciones = problema.getSolutions()
     return soluciones
-    # # Imprimir las soluciones en consola
-    # print(f"N. Soluciones: {len(soluciones)}")
-    # for i, solucion in enumerate(soluciones):
-    #     print(f"Solución {i + 1}:")
-    #     for avion in aviones:
-    #         for franja in range(franjas):
-    #             asignacion = solucion[f"A{avion['id']}_T{franja}"]
-    #             print(f"Avión {avion['id']} - Franja {franja}: {asignacion}")
+
+
+
+
 
 
 if __name__ == "__main__":
@@ -441,23 +312,3 @@ if __name__ == "__main__":
     # Guardar el resultado en un archivo de salida
     escribir_salida(output_file, solution, aviones, franjas, talleres_std, talleres_spc)
 
-
-    # Definición directa de las variables
-    # franjas = 2
-    # m_filas = 3
-    # m_columnas = 1
-    # talleres_std = [(0, 2)]
-    # talleres_spc = [(0, 0)]
-    # parkings = [(0, 1)]
-    # aviones = [
-    #     {'id': 1, 'tipo': 'JMB', 'restr': True, 't1': 1, 't2': 1},
-    #     #{'id': 2, 'tipo': 'STD', 'restr': False, 't1': 1, 't2': 0},
-    #     {'id': 2, 'tipo': 'JMB', 'restr': False, 't1': 1, 't2': 1}
-    #     # {'id': 4, 'tipo': 'JMB', 'restr': True, 't1': 0, 't2': 2},
-    #     # {'id': 5, 'tipo': 'JMB', 'restr': True, 't1': 0, 't2': 2},
-    #     # {'id': 6, 'tipo': 'JMB', 'restr': True, 't1': 0, 't2': 1}
-    #
-    # ]
-    #
-    # # Llamado a la función
-    # definir_modelo(franjas, m_filas, m_columnas, talleres_std, talleres_spc, parkings, aviones)

@@ -460,7 +460,7 @@ if __name__ == "__main__":
     talleres_spc = [(0, 0)]
     parkings = [(0, 1)]
     aviones = [
-        {'id': 1, 'tipo': 'STD', 'restr': False, 't1': 0, 't2': 2},
+        {'id': 1, 'tipo': 'STD', 'restr': False, 't1': 0, 't2': 0},
         # {'id': 2, 'tipo': 'STD', 'restr': False, 't1': 2, 't2': 1},
         # {'id': 3, 'tipo': 'JMB', 'restr': True, 't1': 0, 't2': 2}
         # {'id': 4, 'tipo': 'JMB', 'restr': True, 't1': 0, 't2': 2},

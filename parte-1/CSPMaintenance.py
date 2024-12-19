@@ -188,7 +188,7 @@ def escribir_salida(output_file, solutions, aviones, franjas, talleres_std, tall
 
         # Iterar sobre las soluciones
         for i, solution in enumerate(solutions, start=1):
-            writer.writerow([f"Solución {i}"])
+            writer.writerow([f"Solución {i}:"])
 
             # Iterar sobre los aviones
             for avion in aviones:
@@ -211,8 +211,8 @@ def escribir_salida(output_file, solutions, aviones, franjas, talleres_std, tall
 
                 # Escribir la línea del avión
                 writer.writerow([
-                    f"{avion['id']}-{avion['tipo']}-{avion['restr']}-{avion['t1']}-{avion['t2']}",
-                    " | ".join(asignaciones)
+                    f"{avion['id']}-{avion['tipo']}-{avion['restr']}-{avion['t1']}-{avion['t2']}:",
+                    " , ".join(asignaciones)
                 ])
 
 #Función Principal que llama a las funciones de las restricciones

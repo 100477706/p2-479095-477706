@@ -3,8 +3,8 @@ Universidad Carlos III de Madrid """
 import sys
 from itertools import product
 import time
+import math
 
-from orca.punctuation_settings import infinity
 
 #################################
 ##### Estructuras de Datos ######
@@ -87,17 +87,20 @@ class PriorityQueue(object):
         min_val = 0
         for i in range(len(self.queue)):
             if self.queue[i][0] < self.queue[min_val][0]:
-                minval = i
+                min_val = i
         item = self.queue[min_val][1]
         del self.queue[min_val]
         return item
 
-    #actualiza el valor de la función f de un estado en la lista abierta
+    #verifica si el estado esta dentro de la cola y actualiza el valor de la función f del estado si es mejor
     def actualizar_valor(self, estado, f):
+        dentro = False
         for i in range(len(self.queue)):
             if self.queue[i][1] == estado:
+                dentro = True
                 if self.queue[i][0] > f:
                     self.queue[i][0] = f
+        return dentro
 
 #################################
 ##### Funciones Auxiliares ######
@@ -111,7 +114,6 @@ def cargar_mapa(archivo):
     num_aviones = int(data[0][0])
     start_positions = []
     goal_positions = []
-    prueba = data[1][0]
     #Saco las posiciones iniciales y destino de cada avion
     for i in range(1, num_aviones + 1):
         start = (int(data[i][0][1]), int(data[i][0][3]))
@@ -128,7 +130,7 @@ def cargar_mapa(archivo):
     for j in range(len(colors)):
         fila = []
         for i in range(len(colors[0])):
-            cuadricula = Cuadricula(colors[i][j])
+            cuadricula = Cuadricula(colors[j][i])
             fila.append(cuadricula)
         mapa.append(fila)
     return start, goal, mapa
@@ -137,10 +139,10 @@ def movimientos_validos(pos, mapa):
     filas, columnas = len(mapa), len(mapa[0])
     x, y = pos
     posibles = [(x + dx, y + dy) for dx, dy in [(-1, 0), (1, 0), (0, -1), (0, 1)]]
-    return [(nx, ny) for nx, ny in posibles if 0 <= nx < filas and 0 <= ny < columnas and mapa[nx][ny].color != 'G']
+    return [(nx, ny) for nx, ny in posibles if (0 <= nx < filas) and (0 <= ny < columnas) and (mapa[nx][ny].color != 'G')]
 
 def manhattan(estado, goal):
-    #devolvemos la distancia manhattan maximade los aviones
+    #devolvemos la distancia manhattan maxima de los aviones
     max = 0
     for i in estado.positions.keys():
         actual = estado.positions[i]
@@ -149,6 +151,16 @@ def manhattan(estado, goal):
         if distancia > max:
             max = distancia
 
+    return max
+
+def euclides(estado, goal):
+    max = 0
+    for i in estado.positions.keys():
+        actual = estado.positions[i]
+        objetivo = goal.positions[i]
+        distancia = math.sqrt((actual[0] - objetivo[0]) ** 2 + (actual[1] - objetivo[1]) ** 2)
+        if distancia > max:
+            max = distancia
     return max
 
 def hay_conflicto_cruce(posiciones_actuales, posiciones_nuevas):
@@ -183,9 +195,9 @@ def escritura_camino(path, camino):
                     if pos_inicial == siguiente_pos:
                         f.write(f"({pos_inicial[0]},{pos_inicial[1]}) w ")
                     elif pos_inicial[1] < siguiente_pos[1]:
-                        f.write(f"({pos_inicial[0]},{pos_inicial[1]})  ← ") #flecha para izquierda
+                        f.write(f"({pos_inicial[0]},{pos_inicial[1]})  → ") #flecha para izquierda
                     elif pos_inicial[1] > siguiente_pos[1]:
-                        f.write(f"({pos_inicial[0]},{pos_inicial[1]})  → ") #flecha para derecha
+                        f.write(f"({pos_inicial[0]},{pos_inicial[1]})  ← ") #flecha para derecha
                     elif pos_inicial[0] < siguiente_pos[0]:
                         f.write(f"({pos_inicial[0]},{pos_inicial[1]})  ↓ ") #flecha para abajo
                     elif pos_inicial[0] > siguiente_pos[0]:
@@ -208,7 +220,7 @@ def escritura_stats(path, time, makespan, h_inicial, expanded):
 #################################
 def ASTAR(start, goal, mapa, heuristica, output_file=None):
     open_list = PriorityQueue()  # Frontera
-    open_list.insert((0, start))
+    open_list.insert([0, start])
     visitados = set()
     costes = {start: 0}
     predecesores = {}  # Diccionario para rastrear el camino
@@ -222,23 +234,19 @@ def ASTAR(start, goal, mapa, heuristica, output_file=None):
             if heuristica == 1:
                 return camino, current.time, manhattan(start, goal), len(visitados)
             else:
-                return camino, current.time, manhattan(start, goal), len(visitados)
-
-        if current in visitados:
-            continue
-        visitados.add(current)
+                return camino, current.time, euclides(start, goal), len(visitados)
 
         # Generar todas las combinaciones de movimientos para todos los aviones
         movimientos_aviones = []
         for pos in current.positions.values():
-            movimientos_aviones.append(movimientos_validos(pos, mapa) + [pos])  # Agregar espera
+            movimientos_aviones.append(movimientos_validos(pos, mapa) + [pos])  # Agregamos la  espera
 
         # Crear combinaciones de movimientos paralelos
         for combinacion in product(*movimientos_aviones):  # Todas las combinaciones posibles
             nuevo_positions = {i: combinacion[i] for i in range(len(combinacion))}
 
             # Validar que no haya colisiones
-            if len(set(nuevo_positions.values())) != len(nuevo_positions):  # Checar posiciones únicas
+            if len(set(nuevo_positions.values())) != len(nuevo_positions):
                 continue
 
             # Validar conflictos de cruce
@@ -247,27 +255,40 @@ def ASTAR(start, goal, mapa, heuristica, output_file=None):
 
             # Crear el nuevo estado
             nuevo_estado = Estado(nuevo_positions, current.time + 1)
-
-            if nuevo_estado in visitados:
-                continue
-
             coste = costes[current] + 1  # Todos los movimientos tienen coste 1
+            if nuevo_estado in visitados:
+                if coste < costes[nuevo_estado]:  # Si el nuevo coste es mejor
+                    visitados.remove(nuevo_estado)  # Eliminar de visitados para reexplorarlo
+                else:
+                    continue  # Ignorar si no es un mejor costo
+
             if nuevo_estado not in costes or coste < costes[nuevo_estado]:
                 costes[nuevo_estado] = coste
                 predecesores[nuevo_estado] = current  # Guardar el predecesor
                 if heuristica == 1:
                     heuristic = manhattan(nuevo_estado, goal)
                 else:
-                    heuristic = manhattan(nuevo_estado, goal)
+                    heuristic = euclides(nuevo_estado, goal)
                 f = coste + heuristic
-                open_list.insert((f, nuevo_estado))
+                if not open_list.actualizar_valor(nuevo_estado, f):
+                    open_list.insert([f, nuevo_estado])
+
+        visitados.add(current)
 
     print("No se encontró solución.")
-    return None
+    return None, None, None, None
 
 if __name__ == "__main__":
     inicio = time.time()
     archivo_mapa = sys.argv[1]
+    #para conseguir el nombre del mapa
+    indice_mapa = 22
+    nombre_mapa = ""
+    for i in  range(22,len(archivo_mapa)):
+        if archivo_mapa[i] != ".":
+            nombre_mapa += archivo_mapa[i]
+        else:
+            break
     num_heuristica = int(sys.argv[2])
     start, goal, mapa = cargar_mapa(archivo_mapa)
     camino, makespan, h_inicial, expanded = ASTAR(start, goal, mapa, num_heuristica)
@@ -277,9 +298,9 @@ if __name__ == "__main__":
             f.write("No existe una solución para este problema")
 
     else:
-        path_camino = path_tests + "mapa-" + str(num_heuristica) + ".output"
+        path_camino = path_tests + nombre_mapa + "-" + str(num_heuristica) + ".output"
         escritura_camino(path_camino, camino)
         fin = time.time()
         tiempo_ejecucion = fin - inicio
-        path_stat = path_tests + "mapa-" + str(num_heuristica) + ".stat"
+        path_stat = path_tests + nombre_mapa + "-" + str(num_heuristica) + ".stat"
         escritura_stats(path_stat, tiempo_ejecucion, makespan, h_inicial, expanded)
